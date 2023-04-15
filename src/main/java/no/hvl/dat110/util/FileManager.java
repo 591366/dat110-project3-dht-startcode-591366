@@ -21,7 +21,9 @@ import java.util.Set;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import no.hvl.dat110.chordoperations.ChordLookup;
 import no.hvl.dat110.middleware.Message;
+import no.hvl.dat110.middleware.Node;
 import no.hvl.dat110.rpc.interfaces.NodeInterface;
 
 public class FileManager {
@@ -65,6 +67,13 @@ public class FileManager {
 		// hash the replica
 		
 		// store the hash in the replicafiles array.
+		
+		
+		for(int i = 0; i < numReplicas; i++) {
+			String replica = filename + i;
+			replicafiles[i] = Hash.hashOf(replica);
+		}
+		
 	}
 	
     /**
@@ -97,6 +106,21 @@ public class FileManager {
     	// call the saveFileContent() on the successor and set isPrimary=true if logic above is true otherwise set isPrimary=false
     	
     	// increment counter
+    	
+    	createReplicaFiles();
+    	//ChordLookup lookup = new ChordLookup(chordnode.);
+    	for(int i = 0; i < numReplicas; i++) {
+    		NodeInterface succReplica = chordnode.findSuccessor(replicafiles[i]);
+    		succReplica.addKey(replicafiles[i]);
+    		if(i == index)
+    		{
+    			succReplica.saveFileContent(filename, replicafiles[i], bytesOfFile, true);
+    		} else{
+    			succReplica.saveFileContent(filename, replicafiles[i], bytesOfFile, false);
+    		}
+    	}
+    	
+    	
 		return counter;
     }
 	
@@ -123,6 +147,14 @@ public class FileManager {
 		
 		// save the metadata in the set activeNodesforFile.
 		
+		createReplicaFiles();
+		//ChordLookup lookup = new ChordLookup((Node)chordnode);
+		for(BigInteger r: replicafiles) {
+			NodeInterface succReplica = chordnode.findSuccessor(r);
+			Message message = succReplica.getFilesMetadata(r);
+			activeNodesforFile.add(message);
+		}
+		
 		return activeNodesforFile;
 	}
 	
@@ -141,6 +173,13 @@ public class FileManager {
 		// use the primaryServer boolean variable contained in the Message class to check if it is the primary or not
 		
 		// return the primary when found (i.e., use Util.getProcessStub to get the stub and return it)
+		
+		for(Message m: activeNodesforFile) {
+			Boolean isPrimary = m.isPrimaryServer();
+			if(isPrimary) {
+				return Util.getProcessStub(m.getNodeName(), m.getPort());
+			}
+		}
 		
 		return null; 
 	}
